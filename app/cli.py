@@ -20,30 +20,106 @@ def initialize():
 
 @cli.command()
 def get_user(username:str):
-    # The code for task 5.1 goes here. Once implemented, remove the line below that says "pass"
-    pass
+   with get_session() as db: # Get a connection to the database
+        user = db.exec(select(User).where(User.username == username)).first()
+        if not user:
+            print(f'{username} not found!')
+            return
+        print(user)
 
 @cli.command()
 def get_all_users():
-    # The code for task 5.2 goes here. Once implemented, remove the line below that says "pass"
-    pass
-
+    with get_session() as db:
+        all_users = db.exec(select(User)).all()
+        if not all_users:
+            print("No users found")
+        else:
+            for user in all_users:
+                print(user)
 
 @cli.command()
 def change_email(username: str, new_email:str):
-    # The code for task 6 goes here. Once implemented, remove the line below that says "pass"
-    pass
+   with get_session() as db: # Get a connection to the database
+        user = db.exec(select(User).where(User.username == username)).first()
+        if not user:
+            print(f'{username} not found! Unable to update email.')
+            return
+        user.email = new_email
+        db.add(user)
+        db.commit()
+        print(f"Updated {user.username}'s email to {user.email}")
 
 @cli.command()
 def create_user(username: str, email:str, password: str):
-    # The code for task 7 goes here. Once implemented, remove the line below that says "pass"
-    pass
+     with get_session() as db: # Get a connection to the database
+        newuser = User(username, email, password)
+        try:
+            db.add(newuser)
+            db.commit()
+        except IntegrityError as e:
+            db.rollback() #let the database undo any previous steps of a transaction
+            #print(e.orig) #optionally print the error raised by the database
+            print("Username or email already taken!") #give the user a useful message
+        else:
+            print(newuser) # print the newly created user
 
 @cli.command()
 def delete_user(username: str):
-    # The code for task 8 goes here. Once implemented, remove the line below that says "pass"
-    pass
+    with get_session() as db:
+        user = db.exec(select(User).where(User.username == username)).first()
+        if not user:
+            print(f'{username} not found! Unable to delete user.')
+            return
+        db.delete(user)
+        db.commit()
+        print(f'{username} deleted')
 
 
 if __name__ == "__main__":
     cli()
+
+
+#Exercise 1
+@cli.command()
+def find_user(
+    search: str = typer.Argument(..., help="Partial username or email to search for")
+):
+    """
+    Find users by partial match of username or email.
+    """
+    with get_session() as db:
+        users = db.exec(
+            select(User).where(
+                (User.username.contains(search)) |
+                (User.email.contains(search))
+            )
+        ).all()
+
+        if not users:
+            print("No matching users found")
+            return
+
+        for user in users:
+            print(user)
+
+#Exercise 2
+
+@cli.command()
+def list_users(
+    limit: int = typer.Argument(10, help="Number of users to return"),
+    offset: int = typer.Argument(0, help="Number of users to skip")
+):
+    """
+    List users using pagination.
+    """
+    with get_session() as db:
+        users = db.exec(
+            select(User).offset(offset).limit(limit)
+        ).all()
+
+        if not users:
+            print("No users found")
+            return
+
+        for user in users:
+            print(user)
